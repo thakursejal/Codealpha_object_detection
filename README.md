@@ -119,7 +119,7 @@ Through this project, I gained hands-on experience with:
 
 📁 Project Structure
 
-AI-Object-Detection/
+Codealpha_object_detection/
 │
 ├── app.py
 ├── requirements.txt
