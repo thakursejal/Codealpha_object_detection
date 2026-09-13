@@ -6,6 +6,7 @@ import os
 import glob
 import subprocess
 import imageio_ffmpeg
+from collections import defaultdict
 
 
 # -----------------------------
@@ -97,9 +98,7 @@ if input_type == "📷 Image":
                 use_container_width=True
             )
 
-            st.markdown(
-                "### 📊 Detection Details"
-            )
+            st.markdown("### 📊 Detection Details")
 
             boxes = results[0].boxes
 
@@ -107,17 +106,13 @@ if input_type == "📷 Image":
 
                 for box in boxes:
 
-                    class_id = int(
-                        box.cls[0]
-                    )
+                    class_id = int(box.cls[0])
 
                     confidence = float(
                         box.conf[0]
                     )
 
-                    object_name = model.names[
-                        class_id
-                    ]
+                    object_name = model.names[class_id]
 
                     st.write(
                         f"🔹 **{object_name}** — "
@@ -137,7 +132,9 @@ if input_type == "📷 Image":
 
 else:
 
-    st.info("Upload a video to detect objects frame by frame.")
+    st.info(
+        "Upload a video to detect objects frame by frame."
+    )
 
     uploaded_file = st.file_uploader(
         "📤 Upload Video",
@@ -154,9 +151,7 @@ else:
 
     if uploaded_file is not None:
 
-        st.video(
-            uploaded_file
-        )
+        st.video(uploaded_file)
 
         if st.button(
             "🔍 Detect Objects in Video",
@@ -167,7 +162,9 @@ else:
                 "Processing video... Please wait."
             ):
 
+                # -----------------------------
                 # Save uploaded video
+                # -----------------------------
                 input_suffix = os.path.splitext(
                     uploaded_file.name
                 )[1]
@@ -183,10 +180,19 @@ else:
 
                 input_file.close()
 
-                # Create temporary output directory
+                # -----------------------------
+                # Output directory
+                # -----------------------------
                 output_dir = tempfile.mkdtemp()
 
-                # Run YOLO detection
+                # -----------------------------
+                # Detection statistics
+                # -----------------------------
+                detection_stats = defaultdict(list)
+
+                # -----------------------------
+                # Run YOLO
+                # -----------------------------
                 results = model.predict(
                     source=input_file.name,
                     save=True,
@@ -197,11 +203,42 @@ else:
                     exist_ok=True
                 )
 
-                # Process all frames
-                for _ in results:
-                    pass
+                # -----------------------------
+                # Process video frames
+                # -----------------------------
+                frame_count = 0
 
-                # Find YOLO output video
+                for result in results:
+
+                    frame_count += 1
+
+                    boxes = result.boxes
+
+                    if boxes is not None and len(boxes) > 0:
+
+                        for box in boxes:
+
+                            class_id = int(
+                                box.cls[0]
+                            )
+
+                            confidence = float(
+                                box.conf[0]
+                            )
+
+                            object_name = model.names[
+                                class_id
+                            ]
+
+                            detection_stats[
+                                object_name
+                            ].append(
+                                confidence
+                            )
+
+                # -----------------------------
+                # Find detected video
+                # -----------------------------
                 video_files = glob.glob(
                     os.path.join(
                         output_dir,
@@ -220,8 +257,9 @@ else:
 
                     detected_video = video_files[0]
 
-                    # Convert YOLO AVI output to MP4
-                    # for browser compatibility
+                    # -----------------------------
+                    # Convert to MP4
+                    # -----------------------------
                     mp4_output = os.path.join(
                         output_dir,
                         "detected_output.mp4"
@@ -254,6 +292,9 @@ else:
                         "✅ Video object detection completed!"
                     )
 
+                    # -----------------------------
+                    # Display detected video
+                    # -----------------------------
                     st.markdown(
                         "### 🎥 Detection Result"
                     )
@@ -270,6 +311,59 @@ else:
                         format="video/mp4"
                     )
 
+                    # -----------------------------
+                    # Video Detection Summary
+                    # -----------------------------
+                    st.markdown(
+                        "### 📊 Video Detection Summary"
+                    )
+
+                    if detection_stats:
+
+                        # Number of unique object types
+                        st.write(
+                            f"**Frames processed:** "
+                            f"{frame_count}"
+                        )
+
+                        st.write(
+                            f"**Object types detected:** "
+                            f"{len(detection_stats)}"
+                        )
+
+                        st.markdown(
+                            "#### Detected Objects"
+                        )
+
+                        for object_name, confidences in sorted(
+                            detection_stats.items()
+                        ):
+
+                            average_confidence = (
+                                sum(confidences)
+                                / len(confidences)
+                            )
+
+                            detection_count = len(
+                                confidences
+                            )
+
+                            st.write(
+                                f"🔹 **{object_name}** — "
+                                f"{average_confidence * 100:.1f}% "
+                                f"average confidence "
+                                f"({detection_count} detections)"
+                            )
+
+                    else:
+
+                        st.warning(
+                            "No objects were detected in the video."
+                        )
+
+                    # -----------------------------
+                    # Download button
+                    # -----------------------------
                     st.download_button(
                         label="⬇️ Download Detected Video",
                         data=video_bytes,
@@ -277,7 +371,9 @@ else:
                         mime="video/mp4"
                     )
 
-                # Cleanup input
+                # -----------------------------
+                # Cleanup
+                # -----------------------------
                 try:
                     os.remove(
                         input_file.name
@@ -294,4 +390,4 @@ st.markdown("---")
 st.caption(
     "AI Object Detection | "
     "Built with Python, Streamlit & YOLO"
-                  )
+                )
